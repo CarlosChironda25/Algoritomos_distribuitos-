@@ -1,8 +1,8 @@
 package com.distribuidos;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpExchange;
-import com.distribuidos.LamportClock;
-import com.distribuidos.BullyElection;
+//import com.distribuidos.LamportClock;
+//import com.distribuidos.BullyElection;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -111,4 +111,36 @@ public class App {
     private static void broadcastLamport() {
         long ts = lamport.sendMessage(); // increments and returns
         for (String peer : peers) {
-            
+            String url = buildPeerBase(peer) + "/receive";
+            HttpRequest req = HttpRequest.newBuilder(URI.create(url))
+                    .POST(HttpRequest.BodyPublishers.ofString(Long.toString(ts)))
+                    .build();
+            client.sendAsync(req, HttpResponse.BodyHandlers.ofString())
+                  .thenAccept(resp -> logInfo("lamportSent", "to", url, "status", String.valueOf(resp.statusCode())));
+        }
+    }
+
+    // helper to build http://host:port
+    private static String buildPeerBase(String peer) {
+        // peer expected like node2:50052 or IP:port
+        if (peer.startsWith("http")) return peer;
+        return "http://" + peer;
+    }
+
+    private static void sendText(HttpExchange exchange, int status, String body) throws IOException {
+        exchange.sendResponseHeaders(status, body.getBytes().length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body.getBytes());
+        }
+    }
+
+    // simple JSON-like logging (one line)
+    private static void logInfo(String event, String key1, String val1) {
+        System.out.println(String.format("{\"ts\":\"%s\",\"node\":%d,\"event\":\"%s\",\"%s\":\"%s\"}",
+                Instant.now(), nodeId, event, key1, val1));
+    }
+    private static void logInfo(String event, String key1, String val1, String key2, String val2) {
+        System.out.println(String.format("{\"ts\":\"%s\",\"node\":%d,\"event\":\"%s\",\"%s\":\"%s\",\"%s\":\"%s\"}",
+                Instant.now(), nodeId, event, key1, val1, key2, val2));
+    }
+}
